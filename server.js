@@ -41,6 +41,19 @@ const loginLimiter = rateLimit({
     message: "Too many login attempts. Please try again later."
 });
 
+
+// 🔹 Add Rate Limiting for Chat Messages
+const messageRateLimits = {}; // Store last message timestamps per user
+
+function isRateLimited(username) {
+    const now = Date.now();
+    if (messageRateLimits[username] && now - messageRateLimits[username] < 1000) {
+        return true; // User is sending messages too fast
+    }
+    messageRateLimits[username] = now;
+    return false;
+}
+
 // 🔹 User Registration Route
 app.post('/register', async (req, res) => {
     try {
@@ -113,6 +126,12 @@ wss.on('connection', (ws, req) => {
         } else if (data.type === "message") {
             if (!ws.username) {
                 ws.send(JSON.stringify({ type: "error", message: "Authentication required" }));
+                return;
+            }
+
+            // 🔹 Apply Rate Limiting (1 message per second per user)
+            if (isRateLimited(ws.username)) {
+                ws.send(JSON.stringify({ type: "error", message: "You're sending messages too fast. Please slow down!" }));
                 return;
             }
 
