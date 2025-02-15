@@ -6,20 +6,22 @@ const WebSocket = require('ws');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt'); // ✅ Use bcrypt instead of bcryptjs
 const rateLimit = require('express-rate-limit');
 
 const app = express();
 const cors = require('cors');
 app.use(cors({
-    origin: "https://localhost:3000",  // Allow requests from React frontend
+    origin: "https://localhost:3000",
     credentials: true
 }));
 
 const SECRET_KEY = "supersecretkey"; // Change this for production
 
 // 🔹 Connect to MongoDB
-mongoose.connect('mongodb://127.0.0.1:27017/chatapp')  // 🔹 Fixed: Use 127.0.0.1 instead of localhost
+mongoose.connect('mongodb://127.0.0.1:27017/chatapp', {
+    serverSelectionTimeoutMS: 5000  // Timeout to prevent hanging connections
+})
     .then(() => console.log("✅ MongoDB Connected"))
     .catch(err => console.error("❌ MongoDB Connection Error:", err));
 
@@ -36,8 +38,8 @@ app.use(bodyParser.json());
 
 // 🔹 Rate Limiting for Login (Prevent Brute Force)
 const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // Limit to 5 login attempts per 15 minutes
+    windowMs: 15 * 60 * 1000,
+    max: 5,
     message: "Too many login attempts. Please try again later."
 });
 
@@ -47,7 +49,7 @@ const messageRateLimits = {}; // Store last message timestamps per user
 function isRateLimited(username) {
     const now = Date.now();
     if (messageRateLimits[username] && now - messageRateLimits[username] < 1000) {
-        return true; // User is sending messages too fast
+        return true; 
     }
     messageRateLimits[username] = now;
     return false;
@@ -56,44 +58,70 @@ function isRateLimited(username) {
 // 🔹 User Registration Route
 app.post('/register', async (req, res) => {
     try {
-        const { username, password } = req.body;
+        let { username, password } = req.body;
 
-        // Check if user exists
+        if (!username || !password) {
+            return res.status(400).json({ message: "Username and password are required" });
+        }
+
+        username = String(username).trim();
+        password = String(password).trim();
+
+        console.log(`🔍 Debugging Registration - Username: ${username}, Password: ${password}`);
+
+        if (username.length < 3 || password.length < 6) {
+            return res.status(400).json({ message: "Username must be at least 3 characters, and password at least 6 characters long." });
+        }
+
+        if (typeof password !== 'string' || password.length === 0) {
+            console.error("❌ Registration Error: Password is not a valid string:", password);
+            return res.status(400).json({ message: "Invalid password format" });
+        }
+
         const existingUser = await User.findOne({ username });
         if (existingUser) {
             return res.status(400).json({ message: "Username already taken" });
         }
 
-        // Hash the password
-        const hashedPassword = bcrypt.hashSync(password, 10);
+        console.log(`🔹 Hashing password for user: ${username}`);
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
         const newUser = new User({ username, password: hashedPassword });
 
-        // Save to database
         await newUser.save();
-        res.json({ message: "User registered successfully" });
+        console.log(`✅ User registered successfully: ${username}`);
+        res.status(201).json({ message: "User registered successfully" });
 
     } catch (err) {
-        res.status(500).json({ message: "Internal server error" });
+        console.error("❌ Registration Error:", err);
+        res.status(500).json({ message: "Internal server error", error: err.message });
     }
 });
 
 // 🔹 User Login Route
 app.post('/login', loginLimiter, async (req, res) => {
     try {
-        const { username, password } = req.body;
+        let { username, password } = req.body;
 
-        // Check user in the database
+        if (!username || !password) {
+            return res.status(400).json({ message: "Username and password are required" });
+        }
+
+        username = String(username).trim();
+        password = String(password).trim();
+
         const user = await User.findOne({ username });
-        if (!user || !bcrypt.compareSync(password, user.password)) {
+        if (!user || !await bcrypt.compare(password, user.password)) {
             return res.status(401).json({ message: "Invalid credentials" });
         }
 
-        // Generate JWT Token
         const token = jwt.sign({ username }, SECRET_KEY, { expiresIn: '1h' });
 
         res.json({ token });
 
     } catch (err) {
+        console.error("❌ Login Error:", err);
         res.status(500).json({ message: "Internal server error" });
     }
 });
@@ -124,7 +152,7 @@ wss.on('connection', (ws, req) => {
             client.isAlive = false;
             client.ping();
         });
-    }, 30000); // Check every 30 seconds
+    }, 30000);
 
     ws.on('close', () => {
         clearInterval(heartbeatInterval);
@@ -151,7 +179,6 @@ wss.on('connection', (ws, req) => {
                     return;
                 }
 
-                // 🔹 Apply Rate Limiting (1 message per second per user)
                 if (isRateLimited(ws.username)) {
                     ws.send(JSON.stringify({ type: "error", message: "You're sending messages too fast. Please slow down!" }));
                     return;
@@ -159,7 +186,6 @@ wss.on('connection', (ws, req) => {
 
                 const chatMessage = { username: ws.username, message: data.message };
 
-                // Broadcast to all clients
                 wss.clients.forEach(client => {
                     if (client.readyState === WebSocket.OPEN) {
                         client.send(JSON.stringify({ type: "message", ...chatMessage }));
@@ -167,7 +193,7 @@ wss.on('connection', (ws, req) => {
                 });
             }
         } catch (err) {
-            console.error("Error handling message:", err);
+            console.error("❌ Error handling WebSocket message:", err);
         }
     });
 
