@@ -1,16 +1,24 @@
-const WebSocket = require('ws');
-const http = require('http');
+const fs = require('fs');
+const https = require('https');
 const express = require('express');
+const WebSocket = require('ws');
 const bodyParser = require('body-parser');
 
 const app = express();
-const server = http.createServer(app);
+
+// Load SSL Certificates
+const server = https.createServer({
+    key: fs.readFileSync('server.key'),
+    cert: fs.readFileSync('server.cert')
+}, app);
+
+// Create a WebSocket Server using HTTPS
 const wss = new WebSocket.Server({ server });
 
-let chatHistory = []; // Store message history
+let chatHistory = []; // Store messages
 
 wss.on('connection', (ws) => {
-    console.log('New client connected');
+    console.log('New secure client connected');
 
     // Send chat history to new client
     ws.send(JSON.stringify({ type: 'history', messages: chatHistory }));
@@ -32,7 +40,8 @@ wss.on('connection', (ws) => {
         }
     });
 
-    ws.on('close', () => console.log('Client disconnected'));
+    ws.on('close', () => console.log('Secure WebSocket client disconnected'));
 });
 
-server.listen(3000, () => console.log('Server running on port 3000'));
+// Start the server on HTTPS port 443
+server.listen(443, () => console.log('Secure WebSocket Server running on wss://localhost'));
