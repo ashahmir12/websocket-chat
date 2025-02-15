@@ -1,14 +1,23 @@
 {
   "name": "websocket-chat",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "server.js",
+  "bin": {
+    "server": "./server.js"
+  },
+  "pkg": {
+    "targets": ["node18-win-x64", "node18-linux-x64", "node18-macos-x64"],
+    "outputPath": "dist"
+  },
   "scripts": {
+    "start": "node server.js",
+    "build": "pkg server.js --targets node18-win-x64,node18-linux-x64,node18-macos-x64 --output dist/server",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "WebSocket Chat Server",
   "dependencies": {
     "bcryptjs": "^3.0.0",
     "body-parser": "^1.20.3",
