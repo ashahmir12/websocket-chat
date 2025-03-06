@@ -15,7 +15,7 @@
     "ws": "^8.18.0"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "cross-env HTTPS=true react-scripts start",
     "build": "react-scripts build",
     "package": "electron-packager . WebSocketChat --platform=win32 --arch=x64 --out=dist --overwrite"
   },
@@ -38,7 +38,9 @@
     ]
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "electron": "^34.2.0",
     "electron-packager": "^17.1.2"
-  }
+  },
+  "proxy": "https://localhost"
 }

@@ -12,7 +12,7 @@ const App = () => {
     useEffect(() => {
         if (!token) return;
 
-        let ws = new WebSocket('wss://localhost:443');
+        let ws = new WebSocket('wss://localhost:443'); // ✅ Explicitly using port 443
 
         ws.onopen = () => {
             console.log('Connected to WebSocket server');
@@ -52,10 +52,11 @@ const App = () => {
 
     const register = async () => {
         try {
-            const res = await fetch('https://localhost/register', {
+            const res = await fetch('https://localhost:443/register', { // ✅ Explicitly using port 443
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ username, password }),
+                credentials: 'include' // ✅ Allow credentials in request
             });
             if (res.ok) {
                 alert("User registered! Please log in.");
@@ -70,10 +71,11 @@ const App = () => {
 
     const login = async () => {
         try {
-            const res = await fetch('https://localhost/login', {
+            const res = await fetch('https://localhost:443/login', { // ✅ Explicitly using port 443
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ username, password }),
+                credentials: 'include' // ✅ Allow credentials in request
             });
 
             const data = await res.json();

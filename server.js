@@ -6,21 +6,39 @@ const WebSocket = require('ws');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt'); // ✅ Use bcrypt instead of bcryptjs
+const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
 const cors = require('cors');
+
+// 🔹 CORS Configuration (Ensures frontend can communicate with backend)
 app.use(cors({
-    origin: "https://localhost:3000",
-    credentials: true
+    origin: "https://localhost:3000",  // ✅ Ensures only HTTPS frontend is allowed
+    credentials: true,
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
+// 🔹 Handle Preflight Requests Properly (OPTIONS)
+app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "https://localhost:3000");
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header("Access-Control-Allow-Methods", "GET, POST");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+        return res.status(200).end();
+    }
+
+    next();
+});
 
 const SECRET_KEY = "supersecretkey"; // Change this for production
 
 // 🔹 Connect to MongoDB
 mongoose.connect('mongodb://127.0.0.1:27017/chatapp', {
-    serverSelectionTimeoutMS: 5000  // Timeout to prevent hanging connections
+    serverSelectionTimeoutMS: 5000
 })
     .then(() => console.log("✅ MongoDB Connected"))
     .catch(err => console.error("❌ MongoDB Connection Error:", err));
@@ -30,7 +48,6 @@ const userSchema = new mongoose.Schema({
     username: { type: String, unique: true, required: true },
     password: { type: String, required: true }
 });
-
 const User = mongoose.model('User', userSchema);
 
 // Middleware
@@ -44,12 +61,12 @@ const loginLimiter = rateLimit({
 });
 
 // 🔹 Add Rate Limiting for Chat Messages
-const messageRateLimits = {}; // Store last message timestamps per user
+const messageRateLimits = {};
 
 function isRateLimited(username) {
     const now = Date.now();
     if (messageRateLimits[username] && now - messageRateLimits[username] < 1000) {
-        return true; 
+        return true;
     }
     messageRateLimits[username] = now;
     return false;
@@ -73,11 +90,6 @@ app.post('/register', async (req, res) => {
             return res.status(400).json({ message: "Username must be at least 3 characters, and password at least 6 characters long." });
         }
 
-        if (typeof password !== 'string' || password.length === 0) {
-            console.error("❌ Registration Error: Password is not a valid string:", password);
-            return res.status(400).json({ message: "Invalid password format" });
-        }
-
         const existingUser = await User.findOne({ username });
         if (existingUser) {
             return res.status(400).json({ message: "Username already taken" });
@@ -88,8 +100,8 @@ app.post('/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         const newUser = new User({ username, password: hashedPassword });
-
         await newUser.save();
+
         console.log(`✅ User registered successfully: ${username}`);
         res.status(201).json({ message: "User registered successfully" });
 
@@ -135,18 +147,15 @@ const server = https.createServer({
 const wss = new WebSocket.Server({ server });
 
 wss.on('connection', (ws, req) => {
-    console.log('New secure client connected');
+    console.log('✅ New secure WebSocket client connected');
 
-    // Heartbeat: Detect inactive clients
     ws.isAlive = true;
-    ws.on('pong', () => {
-        ws.isAlive = true;
-    });
+    ws.on('pong', () => { ws.isAlive = true; });
 
     const heartbeatInterval = setInterval(() => {
         wss.clients.forEach(client => {
             if (!client.isAlive) {
-                console.log('Client disconnected due to inactivity');
+                console.log('❌ Client disconnected due to inactivity');
                 return client.terminate();
             }
             client.isAlive = false;
@@ -156,10 +165,10 @@ wss.on('connection', (ws, req) => {
 
     ws.on('close', () => {
         clearInterval(heartbeatInterval);
-        console.log('Client disconnected');
+        console.log('❌ WebSocket Client disconnected');
     });
 
-    // Handle authentication
+    // 🔹 Handle authentication
     ws.on('message', async (message) => {
         try {
             const data = JSON.parse(message);
@@ -197,7 +206,7 @@ wss.on('connection', (ws, req) => {
         }
     });
 
-    ws.on('close', () => console.log('Client disconnected'));
+    ws.on('close', () => console.log('❌ Client disconnected'));
 });
 
 // 🔹 Start HTTPS WebSocket Server
