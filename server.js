@@ -12,17 +12,31 @@ const rateLimit = require('express-rate-limit');
 const app = express();
 const cors = require('cors');
 
-// 🔹 CORS Configuration (Ensures frontend can communicate with backend)
+const allowedOrigins = [
+    'https://localhost:3000',
+    'https://127.0.0.1:3000',
+    'https://192.168.1.107:3000', 
+    'https://192.168.56.1:3000'   
+];
+
 app.use(cors({
-    origin: "https://localhost:3000",  // ✅ Ensures only HTTPS frontend is allowed
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
     methods: ["GET", "POST"],
     allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-// 🔹 Handle Preflight Requests Properly (OPTIONS)
 app.use((req, res, next) => {
-    res.header("Access-Control-Allow-Origin", "https://localhost:3000");
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin)) {
+        res.header("Access-Control-Allow-Origin", origin);
+    }
     res.header("Access-Control-Allow-Credentials", "true");
     res.header("Access-Control-Allow-Methods", "GET, POST");
     res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -34,33 +48,28 @@ app.use((req, res, next) => {
     next();
 });
 
-const SECRET_KEY = "supersecretkey"; // Change this for production
+const SECRET_KEY = "supersecretkey";
 
-// 🔹 Connect to MongoDB
 mongoose.connect('mongodb://127.0.0.1:27017/chatapp', {
     serverSelectionTimeoutMS: 5000
 })
     .then(() => console.log("✅ MongoDB Connected"))
     .catch(err => console.error("❌ MongoDB Connection Error:", err));
 
-// 🔹 User Schema & Model
 const userSchema = new mongoose.Schema({
     username: { type: String, unique: true, required: true },
     password: { type: String, required: true }
 });
 const User = mongoose.model('User', userSchema);
 
-// Middleware
 app.use(bodyParser.json());
 
-// 🔹 Rate Limiting for Login (Prevent Brute Force)
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 5,
     message: "Too many login attempts. Please try again later."
 });
 
-// 🔹 Add Rate Limiting for Chat Messages
 const messageRateLimits = {};
 
 function isRateLimited(username) {
@@ -72,7 +81,6 @@ function isRateLimited(username) {
     return false;
 }
 
-// 🔹 User Registration Route
 app.post('/register', async (req, res) => {
     try {
         let { username, password } = req.body;
@@ -111,7 +119,6 @@ app.post('/register', async (req, res) => {
     }
 });
 
-// 🔹 User Login Route
 app.post('/login', loginLimiter, async (req, res) => {
     try {
         let { username, password } = req.body;
@@ -138,7 +145,6 @@ app.post('/login', loginLimiter, async (req, res) => {
     }
 });
 
-// 🔹 Secure WebSocket Server Setup
 const server = https.createServer({
     key: fs.readFileSync(path.join(__dirname, 'server.key')),
     cert: fs.readFileSync(path.join(__dirname, 'server.cert'))
@@ -168,7 +174,6 @@ wss.on('connection', (ws, req) => {
         console.log('❌ WebSocket Client disconnected');
     });
 
-    // 🔹 Handle authentication
     ws.on('message', async (message) => {
         try {
             const data = JSON.parse(message);
@@ -209,5 +214,6 @@ wss.on('connection', (ws, req) => {
     ws.on('close', () => console.log('❌ Client disconnected'));
 });
 
-// 🔹 Start HTTPS WebSocket Server
-server.listen(443, () => console.log('✅ Secure WebSocket Server running on wss://localhost'));
+server.listen(8443, '0.0.0.0', () => {
+    console.log('✅ Secure WebSocket Server running on wss://0.0.0.0:8443');
+});

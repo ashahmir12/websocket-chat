@@ -12,7 +12,7 @@ const App = () => {
     useEffect(() => {
         if (!token) return;
 
-        let ws = new WebSocket('wss://localhost:443'); // ✅ Explicitly using port 443
+        const ws = new WebSocket(`wss://${window.location.hostname}:8443`);
 
         ws.onopen = () => {
             console.log('Connected to WebSocket server');
@@ -32,7 +32,7 @@ const App = () => {
         ws.onclose = () => {
             console.log('WebSocket Disconnected, attempting to reconnect...');
             setTimeout(() => {
-                setSocket(new WebSocket('wss://localhost:443'));
+                setSocket(new WebSocket(`wss://${window.location.hostname}:8443`)); 
             }, 3000);
         };
 
@@ -52,11 +52,11 @@ const App = () => {
 
     const register = async () => {
         try {
-            const res = await fetch('https://localhost:443/register', { // ✅ Explicitly using port 443
+            const res = await fetch(`https://${window.location.hostname}:8443/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password }),
-                credentials: 'include' // ✅ Allow credentials in request
+                credentials: 'include'
             });
             if (res.ok) {
                 alert("User registered! Please log in.");
@@ -71,11 +71,11 @@ const App = () => {
 
     const login = async () => {
         try {
-            const res = await fetch('https://localhost:443/login', { // ✅ Explicitly using port 443
+            const res = await fetch(`https://${window.location.hostname}:8443/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password }),
-                credentials: 'include' // ✅ Allow credentials in request
+                credentials: 'include'
             });
 
             const data = await res.json();
