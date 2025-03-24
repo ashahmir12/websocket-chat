@@ -8,15 +8,16 @@ const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
+const cors = require('cors');
 
 const app = express();
-const cors = require('cors');
 
 const allowedOrigins = [
     'https://localhost:3000',
     'https://127.0.0.1:3000',
-    'https://192.168.1.107:3000', 
-    'https://192.168.56.1:3000'   
+    'https://192.168.1.107:3000',
+    'https://192.168.56.1:3000',
+    'https://websocket-chat.local:3000'
 ];
 
 app.use(cors({
@@ -71,7 +72,6 @@ const loginLimiter = rateLimit({
 });
 
 const messageRateLimits = {};
-
 function isRateLimited(username) {
     const now = Date.now();
     if (messageRateLimits[username] && now - messageRateLimits[username] < 1000) {
@@ -84,35 +84,24 @@ function isRateLimited(username) {
 app.post('/register', async (req, res) => {
     try {
         let { username, password } = req.body;
+        if (!username || !password) return res.status(400).json({ message: "Username and password are required" });
 
-        if (!username || !password) {
-            return res.status(400).json({ message: "Username and password are required" });
-        }
-
-        username = String(username).trim();
-        password = String(password).trim();
-
-        console.log(`🔍 Debugging Registration - Username: ${username}, Password: ${password}`);
+        username = username.trim();
+        password = password.trim();
 
         if (username.length < 3 || password.length < 6) {
             return res.status(400).json({ message: "Username must be at least 3 characters, and password at least 6 characters long." });
         }
 
         const existingUser = await User.findOne({ username });
-        if (existingUser) {
-            return res.status(400).json({ message: "Username already taken" });
-        }
+        if (existingUser) return res.status(400).json({ message: "Username already taken" });
 
-        console.log(`🔹 Hashing password for user: ${username}`);
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-
-        const newUser = new User({ username, password: hashedPassword });
-        await newUser.save();
+        await new User({ username, password: hashedPassword }).save();
 
         console.log(`✅ User registered successfully: ${username}`);
         res.status(201).json({ message: "User registered successfully" });
-
     } catch (err) {
         console.error("❌ Registration Error:", err);
         res.status(500).json({ message: "Internal server error", error: err.message });
@@ -122,13 +111,10 @@ app.post('/register', async (req, res) => {
 app.post('/login', loginLimiter, async (req, res) => {
     try {
         let { username, password } = req.body;
+        if (!username || !password) return res.status(400).json({ message: "Username and password are required" });
 
-        if (!username || !password) {
-            return res.status(400).json({ message: "Username and password are required" });
-        }
-
-        username = String(username).trim();
-        password = String(password).trim();
+        username = username.trim();
+        password = password.trim();
 
         const user = await User.findOne({ username });
         if (!user || !await bcrypt.compare(password, user.password)) {
@@ -136,14 +122,14 @@ app.post('/login', loginLimiter, async (req, res) => {
         }
 
         const token = jwt.sign({ username }, SECRET_KEY, { expiresIn: '1h' });
-
         res.json({ token });
-
     } catch (err) {
         console.error("❌ Login Error:", err);
         res.status(500).json({ message: "Internal server error" });
     }
 });
+
+const connectedUsers = new Map();
 
 const server = https.createServer({
     key: fs.readFileSync(path.join(__dirname, 'server.key')),
@@ -152,7 +138,7 @@ const server = https.createServer({
 
 const wss = new WebSocket.Server({ server });
 
-wss.on('connection', (ws, req) => {
+wss.on('connection', (ws) => {
     console.log('✅ New secure WebSocket client connected');
 
     ws.isAlive = true;
@@ -169,9 +155,25 @@ wss.on('connection', (ws, req) => {
         });
     }, 30000);
 
+    function broadcastUserList() {
+        const users = Array.from(wss.clients)
+            .filter(client => client.username)
+            .map(client => client.username);
+
+        const msg = JSON.stringify({ type: "users_list", users });
+
+        wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(msg);
+            }
+        });
+    }
+
     ws.on('close', () => {
         clearInterval(heartbeatInterval);
+        connectedUsers.delete(ws);
         console.log('❌ WebSocket Client disconnected');
+        broadcastUserList();
     });
 
     ws.on('message', async (message) => {
@@ -179,30 +181,46 @@ wss.on('connection', (ws, req) => {
             const data = JSON.parse(message);
 
             if (data.type === "auth") {
-                try {
-                    const decoded = jwt.verify(data.token, SECRET_KEY);
-                    ws.username = decoded.username;
-                    ws.send(JSON.stringify({ type: "auth_success", username: decoded.username }));
-                } catch (err) {
-                    ws.send(JSON.stringify({ type: "auth_error", message: "Invalid token" }));
-                    ws.close();
-                }
+                const decoded = jwt.verify(data.token, SECRET_KEY);
+                ws.username = decoded.username;
+                connectedUsers.set(ws, ws.username);
+
+                ws.send(JSON.stringify({ type: "auth_success", username: ws.username }));
+                broadcastUserList();
+
             } else if (data.type === "message") {
-                if (!ws.username) {
-                    ws.send(JSON.stringify({ type: "error", message: "Authentication required" }));
-                    return;
-                }
+                if (!ws.username) return ws.send(JSON.stringify({ type: "error", message: "Authentication required" }));
+                if (isRateLimited(ws.username)) return ws.send(JSON.stringify({ type: "error", message: "You're sending messages too fast." }));
 
-                if (isRateLimited(ws.username)) {
-                    ws.send(JSON.stringify({ type: "error", message: "You're sending messages too fast. Please slow down!" }));
-                    return;
-                }
+                const msg = {
+                    username: ws.username,
+                    to: data.to,
+                    message: data.message
+                };
 
-                const chatMessage = { username: ws.username, message: data.message };
+                const logDir = path.join(__dirname, 'logs');
+                if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
+                
+                const participants = [ws.username, data.to].sort().join('_');
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-'); // For valid filename
+                const sessionKey = `${participants}_${timestamp}`;
+                
+                // Store active log file path per session
+                if (!ws.logFileMap) ws.logFileMap = {};
+                if (!ws.logFileMap[participants]) {
+                    const sessionLog = path.join(logDir, `${sessionKey}.txt`);
+                    ws.logFileMap[participants] = sessionLog;
+                }
+                
+                // Log the message
+                const logMessage = `[${new Date().toISOString()}] ${ws.username} → ${data.to}: ${data.message}\n`;
+                fs.appendFileSync(ws.logFileMap[participants], logMessage);
+                
 
                 wss.clients.forEach(client => {
-                    if (client.readyState === WebSocket.OPEN) {
-                        client.send(JSON.stringify({ type: "message", ...chatMessage }));
+                    const recipient = connectedUsers.get(client);
+                    if (client.readyState === WebSocket.OPEN && (recipient === data.to || recipient === ws.username)) {
+                        client.send(JSON.stringify({ type: "message", ...msg }));
                     }
                 });
             }
@@ -210,8 +228,6 @@ wss.on('connection', (ws, req) => {
             console.error("❌ Error handling WebSocket message:", err);
         }
     });
-
-    ws.on('close', () => console.log('❌ Client disconnected'));
 });
 
 server.listen(8443, '0.0.0.0', () => {

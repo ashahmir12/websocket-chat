@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
+import EmojiPicker from 'emoji-picker-react'; 
 
 const App = () => {
     const [socket, setSocket] = useState(null);
@@ -8,14 +9,19 @@ const App = () => {
     const [password, setPassword] = useState('');
     const [message, setMessage] = useState('');
     const [messages, setMessages] = useState([]);
+    const [selectedUser, setSelectedUser] = useState('');
+    const [userList, setUserList] = useState([]);
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const socketRef = useRef(null);
 
     useEffect(() => {
         if (!token) return;
 
         const ws = new WebSocket(`wss://${window.location.hostname}:8443`);
+        socketRef.current = ws;
 
         ws.onopen = () => {
-            console.log('Connected to WebSocket server');
+            console.log('✅ Connected to WebSocket server');
             ws.send(JSON.stringify({ type: "auth", token }));
         };
 
@@ -23,17 +29,21 @@ const App = () => {
             const data = JSON.parse(event.data);
 
             if (data.type === "auth_success") {
-                console.log("WebSocket Authenticated as:", data.username);
+                console.log("✅ Authenticated as:", data.username);
+            } else if (data.type === "users_list") {
+                setUserList(data.users.filter(u => u !== username));
             } else if (data.type === "message") {
-                setMessages(prev => [...prev, { username: data.username, message: data.message }]);
+                const { username: from, to, message } = data;
+
+                if (from === username || to === username) {
+                    setMessages(prev => [...prev, { from, to, message }]);
+                }
             }
         };
 
         ws.onclose = () => {
-            console.log('WebSocket Disconnected, attempting to reconnect...');
-            setTimeout(() => {
-                setSocket(new WebSocket(`wss://${window.location.hostname}:8443`)); 
-            }, 3000);
+            console.log('❌ WebSocket Disconnected. Reconnecting...');
+            setTimeout(() => setSocket(null), 3000);
         };
 
         setSocket(ws);
@@ -48,7 +58,7 @@ const App = () => {
             clearInterval(heartbeat);
             ws.close();
         };
-    }, [token]);
+    }, [token, username]);
 
     const register = async () => {
         try {
@@ -58,14 +68,15 @@ const App = () => {
                 body: JSON.stringify({ username, password }),
                 credentials: 'include'
             });
+
             if (res.ok) {
-                alert("User registered! Please log in.");
+                alert("✅ User registered! Please log in.");
             } else {
                 const data = await res.json();
-                alert(data.message);
+                alert(`❌ ${data.message}`);
             }
         } catch (err) {
-            console.error("Registration failed", err);
+            console.error("❌ Registration failed", err);
         }
     };
 
@@ -85,15 +96,36 @@ const App = () => {
                 alert(data.message);
             }
         } catch (err) {
-            console.error("Login failed", err);
+            console.error("❌ Login failed", err);
         }
     };
 
+    const formatMessage = (msg) => {
+        return msg
+            .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+            .replace(/_(.*?)_/g, '<i>$1</i>')
+            .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    };
+
     const sendMessage = () => {
-        if (socket && message.trim()) {
-            socket.send(JSON.stringify({ type: "message", message }));
+        if (socket && message.trim() && selectedUser) {
+            const formatted = formatMessage(message);
+            socket.send(JSON.stringify({
+                type: "message",
+                to: selectedUser,
+                message: formatted
+            }));
             setMessage('');
         }
+    };
+
+    const handleEmojiClick = (event, emojiObject) => {
+        setMessage(prev => prev + emojiObject.emoji); 
+        setShowEmojiPicker(false);
+    };
+
+    const handleSelectUser = (newUser) => {
+        setSelectedUser(newUser);
     };
 
     return (
@@ -110,13 +142,47 @@ const App = () => {
                 <>
                     <h2>Welcome, {username}</h2>
                     <button onClick={() => setToken(null)}>Logout</button>
-                    <div className="messages">
-                        {messages.map((msg, index) => (
-                            <div key={index}><strong>{msg.username}:</strong> {msg.message}</div>
-                        ))}
+
+                    <div className="user-selector">
+                        <h3>Chat With:</h3>
+                        <select value={selectedUser} onChange={(e) => handleSelectUser(e.target.value)}>
+                            <option value="">-- Select User --</option>
+                            {userList.map(user => (
+                                <option key={user} value={user}>{user}</option>
+                            ))}
+                        </select>
                     </div>
-                    <input type="text" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Type a message..." />
-                    <button onClick={sendMessage}>Send</button>
+
+                    <div className="messages">
+                        {messages
+                            .filter(msg =>
+                                (msg.from === selectedUser && msg.to === username) ||
+                                (msg.from === username && msg.to === selectedUser)
+                            )
+                            .map((msg, index) => (
+                                <div key={index}>
+                                    <strong>{msg.from}:</strong>{" "}
+                                    <span dangerouslySetInnerHTML={{ __html: msg.message }} />
+                                </div>
+                            ))}
+                    </div>
+
+                    <div className="input-section">
+                        <input
+                            type="text"
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            placeholder="Type a message..."
+                        />
+                        <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>😊</button>
+                        <button onClick={sendMessage}>Send</button>
+                    </div>
+
+                    {showEmojiPicker && (
+                        <div className="emoji-picker">
+                            <EmojiPicker onEmojiClick={handleEmojiClick} />
+                        </div>
+                    )}
                 </>
             )}
         </div>
