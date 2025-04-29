@@ -68,3 +68,23 @@
 - Improved client UX by auto-closing the emoji picker after selection.
 
 
+
+## [v1.3] - 2025-04-29
+### Added
+- Integrated `.env` configuration with `dotenv` for MongoDB URI and JWT secrets.
+- Deployed MongoDB database to MongoDB Atlas (remote cloud DB).
+- Backend refactored for cloud deployment with Railway compatibility.
+- Created production-ready `.gitignore` to exclude sensitive files, build artifacts, and certs.
+- Set up public domain compatibility and production port binding with `process.env.PORT`.
+- Added support for `.env`-based secret injection for cloud environments.
+
+### Fixed
+- Resolved `401` and `429 Too Many Requests` login bug with proper rate-limit JSON responses.
+- Fixed JSON parsing errors in frontend by ensuring consistent error message structure.
+- Fixed Express server to avoid crashes from malformed requests.
+
+### Changed
+- Removed deprecated `useNewUrlParser` and `useUnifiedTopology` options from `mongoose.connect`.
+- Replaced `localhost` with `0.0.0.0` for better LAN and cloud compatibility.
+- Updated WebSocket connection to accept public domain use for future deployment.
+
