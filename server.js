@@ -6,9 +6,10 @@ const WebSocket = require('ws');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
+require('dotenv').config(); 
 
 const app = express();
 
@@ -49,12 +50,14 @@ app.use((req, res, next) => {
     next();
 });
 
-const SECRET_KEY = "supersecretkey";
+const SECRET_KEY = process.env.JWT_SECRET; 
 
-mongoose.connect('mongodb://127.0.0.1:27017/chatapp', {
+mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
     serverSelectionTimeoutMS: 5000
 })
-    .then(() => console.log("✅ MongoDB Connected"))
+    .then(() => console.log("✅ MongoDB Atlas Connected"))
     .catch(err => console.error("❌ MongoDB Connection Error:", err));
 
 const userSchema = new mongoose.Schema({
@@ -66,9 +69,11 @@ const User = mongoose.model('User', userSchema);
 app.use(bodyParser.json());
 
 const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 5,
-    message: "Too many login attempts. Please try again later."
+    windowMs: 1 * 60 * 1000,
+    max: 50,
+    handler: (req, res) => {
+        res.status(429).json({ message: "Too many login attempts. Please try again shortly." });
+    }
 });
 
 const messageRateLimits = {};
@@ -200,22 +205,21 @@ wss.on('connection', (ws) => {
 
                 const logDir = path.join(__dirname, 'logs');
                 if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
-                
+
                 const participants = [ws.username, data.to].sort().join('_');
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-'); // For valid filename
                 const sessionKey = `${participants}_${timestamp}`;
-                
+
                 // Store active log file path per session
                 if (!ws.logFileMap) ws.logFileMap = {};
                 if (!ws.logFileMap[participants]) {
                     const sessionLog = path.join(logDir, `${sessionKey}.txt`);
                     ws.logFileMap[participants] = sessionLog;
                 }
-                
+
                 // Log the message
                 const logMessage = `[${new Date().toISOString()}] ${ws.username} → ${data.to}: ${data.message}\n`;
                 fs.appendFileSync(ws.logFileMap[participants], logMessage);
-                
 
                 wss.clients.forEach(client => {
                     const recipient = connectedUsers.get(client);

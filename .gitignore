@@ -1,1 +1,40 @@
-frontend/dist/WebSocketChat-win32-x64/WebSocketChat.exe
+# Node dependencies
+node_modules/
+
+# Frontend build (React)
+frontend/build/
+frontend/dist/
+
+# Logs & OS junk
+logs/
+*.log
+.DS_Store
+
+# SSL Certs (NEVER commit)
+server.key
+server.cert
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS/IDE
+*.swp
+*.swo
+*.bak
+*.tmp
+.vscode/
+.idea/
+
+# Electron/dist outputs
+frontend/dist/
+frontend/dist/**
+
+# Executables
+*.exe
+*.app
+*.dmg
+
+# Testing
+coverage/
