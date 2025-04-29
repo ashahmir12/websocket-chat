@@ -1,68 +1,90 @@
-# websocket-chat
-📖 WebSocket Chat System - User Guide
-Welcome to the WebSocket Chat System! This guide will help you install, run, and use the chat application.
+🔐 WebSocket Chat System – SecureChat
+Welcome to SecureChat! This is a real-time, end-to-end encrypted chat application built with Node.js, WebSocket, React, and MongoDB. It supports secure messaging with user authentication, presence tracking, and file upload (in progress).
 
-📌 Table of Contents
+📚 Table of Contents
 System Requirements
+
 Installation
+
 Running the Application
+
 Using the Chat
+
 Troubleshooting
+
+Credits
+
 📌 System Requirements
-✔️ Windows 10/11 (64-bit)
-✔️ MongoDB installed and running
+✔️ Windows 10/11 (64-bit) or Linux/macOS
 
-📌 Installation
-1️⃣ Download the application
+✔️ Node.js v18+
 
-If you have the .zip file, extract it to a folder.
-If using GitHub, clone the repository:
-sh
-Copy
-Edit
+✔️ MongoDB Atlas account
+
+✔️ Internet connection for production mode
+
+📦 Installation
+🔁 1. Clone the Repository
 git clone https://github.com/ashahmir12/websocket-chat.git
-2️⃣ Ensure MongoDB is running
+cd websocket-chat
 
-Open a terminal and start MongoDB:
-sh
-Copy
-Edit
-mongod
-3️⃣ Copy SSL Certificates (Only if running the packaged version)
+🗃 2. Setup MongoDB Atlas
+Create a free MongoDB Atlas cluster
 
-Copy server.key and server.cert to the dist/ folder.
-📌 Running the Application
-🖥️ Start the Backend (Server)
-If using the packaged version:
-sh
-Copy
-Edit
-cd dist
-server-win.exe
-If running from source code:
-sh
-Copy
-Edit
+Add your IP or enable 0.0.0.0/0 access temporarily
+
+Create a database user and get your MONGO_URI
+
+🔐 3. Create a .env File
+Create a .env file in the root folder with:
+
+MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/chatapp
+JWT_SECRET=yourSuperSecretKey
+
+🚀 Running the Application
+▶️ Start the Backend Server
+If running from source:
+
+npm install
 node server.js
-🖥️ Start the Frontend (Chat App)
-Run WebSocketChat.exe (from frontend/dist/ folder)
-OR, if running from source code:
-sh
-Copy
-Edit
+
+Requires server.key and server.cert in the root directory.
+
+If running the packaged .exe version:
+
+cd dist/
+./WebSocketChat.exe
+
+▶️ Start the Frontend (React App)
+If running from source:
+
 cd frontend
+npm install
 npm start
-📌 Using the Chat
+
+Access it at: https://localhost:3000
+
+💬 Using the Chat
 1️⃣ Register an Account
-Open the chat app.
-Enter a username and password.
-Click Register.
-Once registered, log in with the same credentials.
+Open the chat in browser
+
+Enter a username and password
+
+Click Register
+
 2️⃣ Log In
-Enter your username and password.
-Click Login to access the chat.
+Enter your credentials
+
+Click Login
+
+You’ll be connected to the chat via WebSocket
+
 3️⃣ Send Messages
-Type a message in the input box.
-Click Send to chat with connected users.
+Select a user from the user list
+
+Type a message
+
+Click Send
+
 4️⃣ Log Out
-Click Logout to disconnect from the chat.
+Click the Logout button to disconnect
