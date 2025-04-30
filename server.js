@@ -17,7 +17,7 @@ const allowedOrigins = [
     'https://127.0.0.1:3000',
     'https://192.168.1.107:3000',
     'https://192.168.56.1:3000',
-    'https://websocket-chat.local:3000'
+    'https://websocket-chat.local:3000',
     'https://zippy-mooncake-2cb816.netlify.app'
 ];
 
