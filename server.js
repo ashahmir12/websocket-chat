@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const https = require('https');
 const express = require('express');
 const WebSocket = require('ws');
 const bodyParser = require('body-parser');
@@ -9,7 +8,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
-require('dotenv').config(); 
+require('dotenv').config();
 
 const app = express();
 
@@ -50,11 +49,9 @@ app.use((req, res, next) => {
     next();
 });
 
-const SECRET_KEY = process.env.JWT_SECRET; 
+const SECRET_KEY = process.env.JWT_SECRET;
 
 mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
     serverSelectionTimeoutMS: 5000
 })
     .then(() => console.log("✅ MongoDB Atlas Connected"))
@@ -136,10 +133,8 @@ app.post('/login', loginLimiter, async (req, res) => {
 
 const connectedUsers = new Map();
 
-const server = https.createServer({
-    key: fs.readFileSync(path.join(__dirname, 'server.key')),
-    cert: fs.readFileSync(path.join(__dirname, 'server.cert'))
-}, app);
+// ✅ Replaced HTTPS with HTTP for Railway compatibility
+const server = require('http').createServer(app);
 
 const wss = new WebSocket.Server({ server });
 
@@ -234,6 +229,8 @@ wss.on('connection', (ws) => {
     });
 });
 
-server.listen(8443, '0.0.0.0', () => {
-    console.log('✅ Secure WebSocket Server running on wss://0.0.0.0:8443');
+// ✅ Use Railway-compatible dynamic port
+const PORT = process.env.PORT || 8443;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ Secure WebSocket Server running on wss://0.0.0.0:${PORT}`);
 });
