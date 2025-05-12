@@ -135,11 +135,23 @@ const App = () => {
     // ✅ Upload file and send link via WebSocket
     const handleFileUpload = async (file) => {
         try {
+            if (!username || !selectedUser) {
+                alert("You must be logged in and select a user to send a file.");
+                return;
+            }
+
+            console.log("Uploading file:", file?.name, "as:", username, "→", selectedUser);
+
             const res = await fetch(`${BACKEND_URL}/get-upload-url`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filename: file.name, username })
             });
+
+            if (!res.ok) {
+                const error = await res.text();
+                throw new Error(`Upload URL request failed: ${error}`);
+            }
 
             const { uploadUrl, fileUrl } = await res.json();
 
@@ -149,7 +161,6 @@ const App = () => {
                 body: file
             });
 
-            // Send file link as a chat message
             socket.send(JSON.stringify({
                 type: 'file',
                 to: selectedUser,
@@ -161,7 +172,7 @@ const App = () => {
             alert("✅ File uploaded and sent!");
         } catch (err) {
             console.error("❌ Upload failed:", err);
-            alert("Failed to upload file");
+            alert("Failed to upload file: " + err.message);
         }
     };
 
