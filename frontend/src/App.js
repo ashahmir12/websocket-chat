@@ -12,6 +12,7 @@ const App = () => {
     const [selectedUser, setSelectedUser] = useState('');
     const [userList, setUserList] = useState([]);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [pendingFile, setPendingFile] = useState(null); // ✅ new
 
     const BACKEND_URL = 'https://websocket-chat-biop.onrender.com';
 
@@ -170,6 +171,7 @@ const App = () => {
             }));
 
             alert("✅ File uploaded and sent!");
+            setPendingFile(null); // ✅ reset file state
         } catch (err) {
             console.error("❌ Upload failed:", err);
             alert("Failed to upload file: " + err.message);
@@ -226,12 +228,20 @@ const App = () => {
                         <button onClick={sendMessage}>Send</button>
                     </div>
 
-                    {/* ✅ New: File Upload Input */}
+                    {/* File Upload Input */}
                     <div className="upload-section">
                         <label>Upload File:</label>
                         <input type="file" onChange={(e) => {
-                            if (e.target.files[0]) handleFileUpload(e.target.files[0]);
+                            if (e.target.files[0]) {
+                                setPendingFile(e.target.files[0]);
+                            }
                         }} />
+                        {pendingFile && (
+                            <div>
+                                <p>Ready to send: {pendingFile.name}</p>
+                                <button onClick={() => handleFileUpload(pendingFile)}>Send File</button>
+                            </div>
+                        )}
                     </div>
 
                     {showEmojiPicker && (
