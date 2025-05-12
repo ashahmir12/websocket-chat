@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
-import EmojiPicker from 'emoji-picker-react'; 
+import EmojiPicker from 'emoji-picker-react';
 
 const App = () => {
     const [socket, setSocket] = useState(null);
@@ -12,7 +12,7 @@ const App = () => {
     const [selectedUser, setSelectedUser] = useState('');
     const [userList, setUserList] = useState([]);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-    const [pendingFile, setPendingFile] = useState(null); // ✅ new
+    const [pendingFile, setPendingFile] = useState(null);
 
     const BACKEND_URL = 'https://websocket-chat-biop.onrender.com';
 
@@ -38,6 +38,9 @@ const App = () => {
                 const { username: from, to, message } = data;
                 if (from === username || to === username) {
                     setMessages(prev => [...prev, { from, to, message }]);
+                    if (to === username && from !== username) {
+                        alert(`📨 New message from ${from}`);
+                    }
                 }
             } else if (data.type === "file") {
                 const { from, to, filename, url } = data;
@@ -133,33 +136,25 @@ const App = () => {
         setSelectedUser(newUser);
     };
 
-    // ✅ Upload file and send link via WebSocket
-    const handleFileUpload = async (file) => {
+    const handleFileUpload = async () => {
+        if (!pendingFile || !selectedUser) {
+            alert("Please select a user and a file first.");
+            return;
+        }
+
         try {
-            if (!username || !selectedUser) {
-                alert("You must be logged in and select a user to send a file.");
-                return;
-            }
-
-            console.log("Uploading file:", file?.name, "as:", username, "→", selectedUser);
-
             const res = await fetch(`${BACKEND_URL}/get-upload-url`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename: file.name, username })
+                body: JSON.stringify({ filename: pendingFile.name, username })
             });
-
-            if (!res.ok) {
-                const error = await res.text();
-                throw new Error(`Upload URL request failed: ${error}`);
-            }
 
             const { uploadUrl, fileUrl } = await res.json();
 
             await fetch(uploadUrl, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/octet-stream' },
-                body: file
+                body: pendingFile
             });
 
             socket.send(JSON.stringify({
@@ -167,14 +162,14 @@ const App = () => {
                 to: selectedUser,
                 from: username,
                 url: fileUrl,
-                filename: file.name
+                filename: pendingFile.name
             }));
 
+            setPendingFile(null);
             alert("✅ File uploaded and sent!");
-            setPendingFile(null); // ✅ reset file state
         } catch (err) {
             console.error("❌ Upload failed:", err);
-            alert("Failed to upload file: " + err.message);
+            alert("Failed to upload file");
         }
     };
 
@@ -228,20 +223,12 @@ const App = () => {
                         <button onClick={sendMessage}>Send</button>
                     </div>
 
-                    {/* File Upload Input */}
                     <div className="upload-section">
                         <label>Upload File:</label>
                         <input type="file" onChange={(e) => {
-                            if (e.target.files[0]) {
-                                setPendingFile(e.target.files[0]);
-                            }
+                            if (e.target.files[0]) setPendingFile(e.target.files[0]);
                         }} />
-                        {pendingFile && (
-                            <div>
-                                <p>Ready to send: {pendingFile.name}</p>
-                                <button onClick={() => handleFileUpload(pendingFile)}>Send File</button>
-                            </div>
-                        )}
+                        <button onClick={handleFileUpload}>Send File</button>
                     </div>
 
                     {showEmojiPicker && (
