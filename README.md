@@ -1,90 +1,104 @@
-🔐 WebSocket Chat System – SecureChat
-Welcome to SecureChat! This is a real-time, end-to-end encrypted chat application built with Node.js, WebSocket, React, and MongoDB. It supports secure messaging with user authentication, presence tracking, and file upload (in progress).
+# 🔐 SecureChat – WebSocket Chat System
+SecureChat is a real-time, end-to-end encrypted chat platform built with Node.js, WebSocket (WSS), React, and MongoDB Atlas. It supports:
 
-📚 Table of Contents
-System Requirements
+- 🔒 Secure JWT-based user authentication
+- 🧠 Live presence indicators and user list
+- 💬 One-on-one messaging with emoji and markdown support
+- 📁 File sharing via AWS S3 (secure uploads with signed URLs)
+- 🌐 Deployed frontend via Netlify and backend on Render
 
-Installation
+## 📚 Table of Contents
+- System Requirements
+- Installation
+- Environment Variables
+- Running the Application
+- Using the Chat
+- Troubleshooting
+- Credits
 
-Running the Application
+## ✔️ System Requirements
+- Windows 10/11 (64-bit), Linux, or macOS
+- Node.js v18 or later
+- MongoDB Atlas account
+- AWS S3 bucket (for file sharing)
+- Internet connection (for cloud deployment)
 
-Using the Chat
+## 📦 Installation
 
-Troubleshooting
-
-Credits
-
-📌 System Requirements
-✔️ Windows 10/11 (64-bit) or Linux/macOS
-
-✔️ Node.js v18+
-
-✔️ MongoDB Atlas account
-
-✔️ Internet connection for production mode
-
-📦 Installation
-🔁 1. Clone the Repository
+### 🔁 1. Clone the Repository
 git clone https://github.com/ashahmir12/websocket-chat.git
 cd websocket-chat
 
-🗃 2. Setup MongoDB Atlas
-Create a free MongoDB Atlas cluster
+### 🗃 2. Set Up MongoDB Atlas
+- Create a free cluster at https://www.mongodb.com/cloud/atlas
+- Add your IP or allow global access (0.0.0.0/0)
+- Create a database user and copy the Connection URI
 
-Add your IP or enable 0.0.0.0/0 access temporarily
-
-Create a database user and get your MONGO_URI
-
-🔐 3. Create a .env File
-Create a .env file in the root folder with:
+## 🔐 Environment Variables
+Create a `.env` file in the project root:
 
 MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/chatapp
 JWT_SECRET=yourSuperSecretKey
+AWS_ACCESS_KEY_ID=yourAwsAccessKey
+AWS_SECRET_ACCESS_KEY=yourAwsSecretKey
+S3_BUCKET_NAME=your-s3-bucket-name
 
-🚀 Running the Application
-▶️ Start the Backend Server
-If running from source:
+For deployment, these variables must also be added in Render > Environment > Environment Variables.
 
+## 🚀 Running the Application
+
+### ▶️ Start the Backend (Node.js + WebSocket)
 npm install
 node server.js
 
-Requires server.key and server.cert in the root directory.
+Alternatively, you can deploy to Render for cloud hosting.
 
-If running the packaged .exe version:
-
-cd dist/
-./WebSocketChat.exe
-
-▶️ Start the Frontend (React App)
-If running from source:
-
+### ▶️ Start the Frontend (React App)
 cd frontend
 npm install
 npm start
 
-Access it at: https://localhost:3000
+Access it at:
+http://localhost:3000
 
-💬 Using the Chat
-1️⃣ Register an Account
-Open the chat in browser
+Or view live deployment:
+https://zippy-mooncake-2cb816.netlify.app
 
-Enter a username and password
+## 💬 Using the Chat
 
-Click Register
+### 1️⃣ Register or Log In
+- Enter a username and password
+- Click Register (first time) or Login
 
-2️⃣ Log In
-Enter your credentials
+### 2️⃣ Chat with Online Users
+- Select a user from the dropdown list
+- Send formatted messages using markdown:
+  - **bold**, _italic_, [link](https://example.com)
+- Emojis supported via integrated picker
+- Typing indicators and presence tracking enabled
 
-Click Login
+### 3️⃣ Upload & Share Files
+- Click Choose File to select any file
+- Click Send File to securely upload to S3
+- Recipient receives a clickable file link in chat
 
-You’ll be connected to the chat via WebSocket
+### 4️⃣ Log Out
+- Click Logout to disconnect and clear session
 
-3️⃣ Send Messages
-Select a user from the user list
+## 🧪 Troubleshooting
 
-Type a message
+- WebSocket not connecting?
+  Ensure your backend is running on Render and your frontend has the correct wss:// URL.
 
-Click Send
+- File upload not working?
+  Check your AWS S3 bucket permissions. Make sure you’ve disabled Block Public Access and added a public-read bucket policy.
 
-4️⃣ Log Out
-Click the Logout button to disconnect
+- Netlify build fails?
+  Ensure you’ve installed all dependencies (emoji-picker-react, etc.) and specified Node version if needed.
+
+## 👥 Credits
+- Built by @ashahmir12
+- Cloud hosting: Render, Netlify, MongoDB Atlas, AWS S3
+- Emoji Picker: emoji-picker-react
+
+🔒 SecureChat is under active development. Contributions and feedback are welcome!

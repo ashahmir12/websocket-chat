@@ -88,3 +88,28 @@
 - Replaced `localhost` with `0.0.0.0` for better LAN and cloud compatibility.
 - Updated WebSocket connection to accept public domain use for future deployment.
 
+
+
+
+## [v1.4] - 2025-05-09
+### Added
+- Integrated secure file upload support using AWS S3 with signed PUT URLs.
+- Implemented /get-upload-url endpoint on the backend to generate expiring upload links for authenticated users.
+- Introduced file message type into WebSocket protocol, allowing file metadata and URLs to be relayed to intended recipients.
+- Updated frontend UI to include a file upload input with a "Send File" confirmation button (prevents accidental sends).
+- Uploaded files are now shared via clickable links in chat, including filename and origin user.
+- Automatically invalidates file uploads if no recipient is selected, improving UX safety.
+- Configured S3 CORS and bucket policy to allow secure public file access after upload.
+- Added AWS credentials and S3 bucket name to .env files to support deployment on Render.
+
+### Fixed
+- Resolved 500 Internal Server Error when trying to get upload URL by fixing environment variable injection and ensuring region and bucket naming are accurate.
+- Fixed JSON parsing errors in frontend by ensuring consistent error message structure.
+- Fixed frontend bug where uploaded emoji values were undefined due to outdated onEmojiClick handler format (switched to emojiData.emoji).
+- Fixed CORS and policy issues in S3 preventing public file access from chat links.
+
+### Changed
+- Updated frontend App.js to delay file uploads until the user confirms with "Send File", improving control and flow.
+- Refactored WebSocket file message handling on the server to mirror behavior of message broadcasts with validation and per-user delivery.
+- Disabled S3's BlockPublicAccess to allow file sharing only via explicit GetObject permission.
+- Cleaned up upload flow to reset pending file after send, preserving clean UI state.
