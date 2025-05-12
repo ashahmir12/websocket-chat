@@ -12,7 +12,6 @@ require('dotenv').config();
 
 const app = express();
 
-// AWS SDK for S3 Signed Uploads
 const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 
@@ -25,7 +24,6 @@ AWS.config.update({
 const s3 = new AWS.S3();
 const BUCKET_NAME = process.env.S3_BUCKET_NAME;
 
-// CORS configuration for Netlify + dev environments
 const allowedOrigins = [
     'https://localhost:3000',
     'https://127.0.0.1:3000',
@@ -78,7 +76,6 @@ const User = mongoose.model('User', userSchema);
 
 app.use(bodyParser.json());
 
-// Throttle brute-force login attempts
 const loginLimiter = rateLimit({
     windowMs: 1 * 60 * 1000,
     max: 50,
@@ -145,7 +142,6 @@ app.post('/login', loginLimiter, async (req, res) => {
     }
 });
 
-// Get a signed S3 upload URL for a file
 app.post('/get-upload-url', async (req, res) => {
     const { filename, username } = req.body;
 
@@ -158,7 +154,7 @@ app.post('/get-upload-url', async (req, res) => {
     const params = {
         Bucket: BUCKET_NAME,
         Key: key,
-        Expires: 60, // URL valid for 1 minute
+        Expires: 60,
         ContentType: 'application/octet-stream'
     };
 
@@ -174,7 +170,6 @@ app.post('/get-upload-url', async (req, res) => {
 
 const connectedUsers = new Map();
 
-// HTTP server for Railway (no HTTPS here)
 const server = require('http').createServer(app);
 const wss = new WebSocket.Server({ server });
 
@@ -260,7 +255,28 @@ wss.on('connection', (ws) => {
                         client.send(JSON.stringify({ type: "message", ...msg }));
                     }
                 });
+
+            } else if (data.type === "file") {
+                if (!ws.username) return ws.send(JSON.stringify({ type: "error", message: "Authentication required" }));
+                if (!data.to || !data.url || !data.filename) {
+                    return ws.send(JSON.stringify({ type: "error", message: "Missing file data." }));
+                }
+
+                const msg = {
+                    from: ws.username,
+                    to: data.to,
+                    url: data.url,
+                    filename: data.filename
+                };
+
+                wss.clients.forEach(client => {
+                    const recipient = connectedUsers.get(client);
+                    if (client.readyState === WebSocket.OPEN && (recipient === data.to || recipient === ws.username)) {
+                        client.send(JSON.stringify({ type: "file", ...msg }));
+                    }
+                });
             }
+
         } catch (err) {
             console.error("❌ Error handling WebSocket message:", err);
         }
