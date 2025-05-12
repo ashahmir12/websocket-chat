@@ -123,8 +123,8 @@ const App = () => {
         }
     };
 
-    const handleEmojiClick = (event, emojiObject) => {
-        setMessage(prev => prev + emojiObject.emoji);
+    const handleEmojiClick = (emojiData) => {
+        setMessage(prev => prev + emojiData.emoji);
         setShowEmojiPicker(false);
     };
 
