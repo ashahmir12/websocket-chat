@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import EmojiPicker from 'emoji-picker-react'; 
 
@@ -12,13 +12,14 @@ const App = () => {
     const [selectedUser, setSelectedUser] = useState('');
     const [userList, setUserList] = useState([]);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-    const socketRef = useRef(null);
+
+    const BACKEND_URL = 'https://websocket-chat-biop.onrender.com';
 
     useEffect(() => {
         if (!token) return;
 
-        const ws = new WebSocket(`wss://${window.location.hostname}:8443`);
-        socketRef.current = ws;
+        const ws = new WebSocket(`wss://websocket-chat-biop.onrender.com`);
+        setSocket(ws);
 
         ws.onopen = () => {
             console.log('✅ Connected to WebSocket server');
@@ -34,9 +35,14 @@ const App = () => {
                 setUserList(data.users.filter(u => u !== username));
             } else if (data.type === "message") {
                 const { username: from, to, message } = data;
-
                 if (from === username || to === username) {
                     setMessages(prev => [...prev, { from, to, message }]);
+                }
+            } else if (data.type === "file") {
+                const { from, to, filename, url } = data;
+                if (from === username || to === username) {
+                    const fileLink = `<a href="${url}" target="_blank" rel="noopener noreferrer">${filename}</a>`;
+                    setMessages(prev => [...prev, { from, to, message: fileLink }]);
                 }
             }
         };
@@ -45,8 +51,6 @@ const App = () => {
             console.log('❌ WebSocket Disconnected. Reconnecting...');
             setTimeout(() => setSocket(null), 3000);
         };
-
-        setSocket(ws);
 
         const heartbeat = setInterval(() => {
             if (ws.readyState === WebSocket.OPEN) {
@@ -62,11 +66,10 @@ const App = () => {
 
     const register = async () => {
         try {
-            const res = await fetch(`https://${window.location.hostname}:8443/register`, {
+            const res = await fetch(`${BACKEND_URL}/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password }),
-                credentials: 'include'
+                body: JSON.stringify({ username, password })
             });
 
             if (res.ok) {
@@ -77,16 +80,16 @@ const App = () => {
             }
         } catch (err) {
             console.error("❌ Registration failed", err);
+            alert("❌ Could not connect to server.");
         }
     };
 
     const login = async () => {
         try {
-            const res = await fetch(`https://${window.location.hostname}:8443/login`, {
+            const res = await fetch(`${BACKEND_URL}/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password }),
-                credentials: 'include'
+                body: JSON.stringify({ username, password })
             });
 
             const data = await res.json();
@@ -97,6 +100,7 @@ const App = () => {
             }
         } catch (err) {
             console.error("❌ Login failed", err);
+            alert("❌ Could not connect to server.");
         }
     };
 
@@ -120,12 +124,45 @@ const App = () => {
     };
 
     const handleEmojiClick = (event, emojiObject) => {
-        setMessage(prev => prev + emojiObject.emoji); 
+        setMessage(prev => prev + emojiObject.emoji);
         setShowEmojiPicker(false);
     };
 
     const handleSelectUser = (newUser) => {
         setSelectedUser(newUser);
+    };
+
+    // ✅ Upload file and send link via WebSocket
+    const handleFileUpload = async (file) => {
+        try {
+            const res = await fetch(`${BACKEND_URL}/get-upload-url`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: file.name, username })
+            });
+
+            const { uploadUrl, fileUrl } = await res.json();
+
+            await fetch(uploadUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/octet-stream' },
+                body: file
+            });
+
+            // Send file link as a chat message
+            socket.send(JSON.stringify({
+                type: 'file',
+                to: selectedUser,
+                from: username,
+                url: fileUrl,
+                filename: file.name
+            }));
+
+            alert("✅ File uploaded and sent!");
+        } catch (err) {
+            console.error("❌ Upload failed:", err);
+            alert("Failed to upload file");
+        }
     };
 
     return (
@@ -176,6 +213,14 @@ const App = () => {
                         />
                         <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>😊</button>
                         <button onClick={sendMessage}>Send</button>
+                    </div>
+
+                    {/* ✅ New: File Upload Input */}
+                    <div className="upload-section">
+                        <label>Upload File:</label>
+                        <input type="file" onChange={(e) => {
+                            if (e.target.files[0]) handleFileUpload(e.target.files[0]);
+                        }} />
                     </div>
 
                     {showEmojiPicker && (

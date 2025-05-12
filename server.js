@@ -12,13 +12,28 @@ require('dotenv').config();
 
 const app = express();
 
+// AWS SDK for S3 Signed Uploads
+const AWS = require('aws-sdk');
+const { v4: uuidv4 } = require('uuid');
+
+AWS.config.update({
+    region: 'us-west-1',
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+});
+
+const s3 = new AWS.S3();
+const BUCKET_NAME = process.env.S3_BUCKET_NAME;
+
+// CORS configuration for Netlify + dev environments
 const allowedOrigins = [
     'https://localhost:3000',
     'https://127.0.0.1:3000',
     'https://192.168.1.107:3000',
     'https://192.168.56.1:3000',
     'https://websocket-chat.local:3000',
-    'https://zippy-mooncake-2cb816.netlify.app'
+    'https://zippy-mooncake-2cb816.netlify.app',
+    'https://websocketchat.secure-tech.org'
 ];
 
 app.use(cors({
@@ -43,10 +58,7 @@ app.use((req, res, next) => {
     res.header("Access-Control-Allow-Methods", "GET, POST");
     res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-    if (req.method === "OPTIONS") {
-        return res.status(200).end();
-    }
-
+    if (req.method === "OPTIONS") return res.status(200).end();
     next();
 });
 
@@ -66,6 +78,7 @@ const User = mongoose.model('User', userSchema);
 
 app.use(bodyParser.json());
 
+// Throttle brute-force login attempts
 const loginLimiter = rateLimit({
     windowMs: 1 * 60 * 1000,
     max: 50,
@@ -132,11 +145,37 @@ app.post('/login', loginLimiter, async (req, res) => {
     }
 });
 
+// Get a signed S3 upload URL for a file
+app.post('/get-upload-url', async (req, res) => {
+    const { filename, username } = req.body;
+
+    if (!filename || !username) {
+        return res.status(400).json({ error: 'Missing filename or username' });
+    }
+
+    const key = `${username}/${uuidv4()}-${filename}`;
+
+    const params = {
+        Bucket: BUCKET_NAME,
+        Key: key,
+        Expires: 60, // URL valid for 1 minute
+        ContentType: 'application/octet-stream'
+    };
+
+    try {
+        const uploadUrl = await s3.getSignedUrlPromise('putObject', params);
+        const fileUrl = `https://${BUCKET_NAME}.s3.${AWS.config.region}.amazonaws.com/${key}`;
+        res.json({ uploadUrl, fileUrl });
+    } catch (err) {
+        console.error("❌ Failed to generate signed URL:", err);
+        res.status(500).json({ error: 'Could not generate upload URL' });
+    }
+});
+
 const connectedUsers = new Map();
 
-// ✅ Replaced HTTPS with HTTP for Railway compatibility
+// HTTP server for Railway (no HTTPS here)
 const server = require('http').createServer(app);
-
 const wss = new WebSocket.Server({ server });
 
 wss.on('connection', (ws) => {
@@ -203,17 +242,15 @@ wss.on('connection', (ws) => {
                 if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
 
                 const participants = [ws.username, data.to].sort().join('_');
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-'); // For valid filename
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
                 const sessionKey = `${participants}_${timestamp}`;
 
-                // Store active log file path per session
                 if (!ws.logFileMap) ws.logFileMap = {};
                 if (!ws.logFileMap[participants]) {
                     const sessionLog = path.join(logDir, `${sessionKey}.txt`);
                     ws.logFileMap[participants] = sessionLog;
                 }
 
-                // Log the message
                 const logMessage = `[${new Date().toISOString()}] ${ws.username} → ${data.to}: ${data.message}\n`;
                 fs.appendFileSync(ws.logFileMap[participants], logMessage);
 
@@ -230,7 +267,6 @@ wss.on('connection', (ws) => {
     });
 });
 
-// ✅ Use Railway-compatible dynamic port
 const PORT = process.env.PORT || 8443;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Secure WebSocket Server running on wss://0.0.0.0:${PORT}`);
