@@ -67,6 +67,7 @@ https://zippy-mooncake-2cb816.netlify.app
 ## 💬 Using the Chat
 
 ### 1️⃣ Register or Log In
+- PLease wait up to 1-2 min when running the site to connect to the Render Backend
 - Enter a username and password
 - Click Register (first time) or Login
 
